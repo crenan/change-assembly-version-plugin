@@ -68,37 +68,45 @@ public class ReplacementsTest {
             @Override
             public boolean perform(AbstractBuild<?, ?> build, Launcher launcher,
                     BuildListener listener) throws InterruptedException, IOException {
-                build.getWorkspace().child("AssemblyVersion.cs").write("using System.Reflection;\n"
-                        + "\n"
-                        + "[assembly: AssemblyTitle(\"\")]\n"
-                        + "[assembly: AssemblyDescription(\"\")]\n"
-                        + "[assembly: AssemblyCompany(\"\")]\n"
-                        + "[assembly: AssemblyProduct(\"\")]\n"
-                        + "[assembly: AssemblyCopyright(\"\")]\n"
-                        + "[assembly: AssemblyTrademark(\"\")]\n"
-                        + "[assembly: AssemblyCulture(\"\")]\n"
-                        + "[assembly: AssemblyVersion(\"13.1.1.976\")]", "UTF-8");
+                build.getWorkspace()
+                        .child("AssemblyVersion.cs")
+                        .write(
+                                "using System.Reflection;\n"
+                                + "\n"
+                                + "[assembly: AssemblyTitle(\"\")]\n"
+                                + "[assembly: AssemblyDescription(\"\")]\n"
+                                + "[assembly: AssemblyConfiguration(\"\")]\n"
+                                + "[assembly: AssemblyCompany(\"\")]\n"
+                                + "[assembly: AssemblyProduct(\"\")]\n"
+                                + "[assembly: AssemblyCopyright(\"\")]\n"
+                                + "[assembly: AssemblyTrademark(\"\")]\n"
+                                + "[assembly: AssemblyCulture(\"\")]\n"
+                                + "[assembly: AssemblyVersion(\"13.1.1.976\")]"
+                                + "[assembly: AssemblyFileVersion(\"13.1.1.976\")]"
+                                + "[assembly: AssemblyInformationalVersion(\"13.01.1976\")]", "UTF-8");
                 return true;
             }
         });
-        ChangeAssemblyVersion builder = new ChangeAssemblyVersion("$PREFIX.${BUILD_NUMBER}", "AssemblyVersion.cs", "", "", "MyTitle", "MyDescription", "MyCompany", "MyProduct", "MyCopyright", "MyTrademark", "MyCulture", "$PREFIX.${BUILD_NUMBER}");
+        ChangeAssemblyVersion builder = new ChangeAssemblyVersion("AssemblyVersion.cs", "", "", "MyTitle", "MyDescription", "MyConfig", "MyCompany", "MyProduct", "MyCopyright", "MyTrademark", "MyCulture", "$PREFIX.${BUILD_NUMBER}", "$PREFIX.${BUILD_NUMBER}");
         project.getBuildersList().add(builder);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
-
-        //String s = FileUtils.readFileToString(build.getLogFile());
+        String buildNum = String.valueOf(build.number);
         String content = build.getWorkspace().child("AssemblyVersion.cs").readToString();
-        assertTrue(content.contains("AssemblyVersion(\"1.1.0."));
 
+        assertTrue(content.contains("AssemblyVersion(\"1.1.0." + buildNum));
+        assertTrue(content.contains("AssemblyFileVersion(\"1.1.0." + buildNum));
         // Check that we update additional assembly info
         assertTrue(content.contains("AssemblyTitle(\"MyTitle"));
         assertTrue(content.contains("AssemblyDescription(\"MyDescription"));
+        assertTrue(content.contains("AssemblyConfiguration(\"MyConfig"));
         assertTrue(content.contains("AssemblyCompany(\"MyCompany"));
         assertTrue(content.contains("AssemblyProduct(\"MyProduct"));
         assertTrue(content.contains("AssemblyCopyright(\"MyCopyright"));
         assertTrue(content.contains("AssemblyTrademark(\"MyTrademark"));
         assertTrue(content.contains("AssemblyCulture(\"MyCulture"));
+        assertTrue(content.contains("AssemblyInformationalVersion(\"1.1.0." + buildNum));
 
-        assertTrue(builder.getVersionPattern().equals("$PREFIX.${BUILD_NUMBER}"));
+        assertTrue(builder.getAssemblyVersion().equals("$PREFIX.${BUILD_NUMBER}"));
     }
 
     @Test
@@ -123,7 +131,7 @@ public class ReplacementsTest {
                 return true;
             }
         });
-        ChangeAssemblyVersion builder = new ChangeAssemblyVersion("$PREFIX.${BUILD_NUMBER}", "", "", "", "", "", "", "", "", "", "", "");
+        ChangeAssemblyVersion builder = new ChangeAssemblyVersion("", "", "", "", "", "", "", "", "", "", "", "$PREFIX.${BUILD_NUMBER}", "");
         project.getBuildersList().add(builder);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
 
@@ -132,7 +140,7 @@ public class ReplacementsTest {
         assertTrue(content.contains("AssemblyVersion(\"1.1.0."));
         content = build.getWorkspace().child(f2).readToString();
         assertTrue(content.contains("AssemblyVersion(\"13.1.1.976"));
-        assertTrue(builder.getVersionPattern().equals("$PREFIX.${BUILD_NUMBER}"));
+        assertTrue(builder.getAssemblyVersion().equals("$PREFIX.${BUILD_NUMBER}"));
     }
 
     @Test
@@ -145,27 +153,28 @@ public class ReplacementsTest {
                     BuildListener listener) throws InterruptedException, IOException {
                 OutputStream outputStream = build.getWorkspace().child("AssemblyVersion.cs").write();
                 outputStream.write(fileBom.getBytes());
-                OutputStreamWriter w = new OutputStreamWriter(outputStream, "UTF-8");
-                try {
+                try (OutputStreamWriter w = new OutputStreamWriter(outputStream, "UTF-8")) {
                     w.write("using System.Reflection;\n"
                             + "\n"
                             + "[assembly: AssemblyTitle(\"\")]\n"
                             + "[assembly: AssemblyDescription(\"\")]\n"
+                            + "[assembly: AssemblyConfiguration(\"\")]\n"
                             + "[assembly: AssemblyCompany(\"\")]\n"
                             + "[assembly: AssemblyProduct(\"\")]\n"
                             + "[assembly: AssemblyCopyright(\"\")]\n"
                             + "[assembly: AssemblyTrademark(\"\")]\n"
                             + "[assembly: AssemblyCulture(\"\")]\n"
-                            + "[assembly: AssemblyVersion(\"13.1.1.976\")]");
+                            + "[assembly: AssemblyVersion(\"13.1.1.976\")]"
+                            + "[assembly: AssemblyFileVersion(\"13.1.1.976\")]"
+                            + "[assembly: AssemblyInformationalVersion(\"13.01.1976\")]");
                 } finally {
-                    w.close();
                     outputStream.close();
                 }
 
                 return true;
             }
         });
-        ChangeAssemblyVersion builder = new ChangeAssemblyVersion("1.2.3", "AssemblyVersion.cs", "", "", "MyTitle", "MyDescription", "MyCompany", "MyProduct", "MyCopyright", "MyTrademark", "MyCulture", "01.02.03");
+        ChangeAssemblyVersion builder = new ChangeAssemblyVersion("AssemblyVersion.cs", "", "", "MyTitle", "MyDescription", "MyConfig", "MyCompany", "MyProduct", "MyCopyright", "MyTrademark", "MyCulture", "1.2.3", "01.02.03");
         project.getBuildersList().add(builder);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
 
@@ -184,6 +193,7 @@ public class ReplacementsTest {
         // Check that we update additional assembly info
         assertTrue(content.contains("AssemblyTitle(\"MyTitle"));
         assertTrue(content.contains("AssemblyDescription(\"MyDescription"));
+        assertTrue(content.contains("AssemblyConfiguration(\"MyConfig"));
         assertTrue(content.contains("AssemblyCompany(\"MyCompany"));
         assertTrue(content.contains("AssemblyProduct(\"MyProduct"));
         assertTrue(content.contains("AssemblyCopyright(\"MyCopyright"));
@@ -223,11 +233,8 @@ public class ReplacementsTest {
         project.getBuildersList().add(builder);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
 
-        //String s = FileUtils.readFileToString(build.getLogFile());
         InputStream readStream = build.getWorkspace().child("AssemblyVersion.cs").read();
-
         byte[] binaryAfterChange = IOUtils.toByteArray(readStream);
-//        String content = new String(binaryAfterChange, "UTF-8");
 
         // the replaced file should have the same BOM as the origin.
         assertTrue(Arrays.areEqual(originFileBinary, binaryAfterChange));
@@ -268,7 +275,6 @@ public class ReplacementsTest {
         project.getBuildersList().add(builder);
         FreeStyleBuild build = project.scheduleBuild2(0).get();
 
-        //String s = FileUtils.readFileToString(build.getLogFile());
         InputStream readStream = build.getWorkspace().child("AssemblyVersion.cs").read();
         byte[] binaryAfterChange = IOUtils.toByteArray(readStream);
         readStream.close();

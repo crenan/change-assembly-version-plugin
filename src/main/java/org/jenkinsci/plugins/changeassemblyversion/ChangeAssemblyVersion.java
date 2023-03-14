@@ -26,50 +26,43 @@ import org.kohsuke.stapler.DataBoundSetter;
  */
 public class ChangeAssemblyVersion extends Builder implements SimpleBuildStep {
 
-    private final String versionPattern;
     private String assemblyFile;
     private String regexPattern;
     private String replacementPattern;
     private String assemblyTitle;
     private String assemblyDescription;
+    private String assemblyConfiguration;
     private String assemblyCompany;
     private String assemblyProduct;
     private String assemblyCopyright;
     private String assemblyTrademark;
     private String assemblyCulture;
+    private String assemblyVersion;
     private String assemblyInformationalVersion;
 
     @Deprecated
-    public ChangeAssemblyVersion(String versionPattern,
-            String assemblyFile,
-            String regexPattern,
-            String replacementPattern,
-            String assemblyTitle,
-            String assemblyDescription,
-            String assemblyCompany,
-            String assemblyProduct,
-            String assemblyCopyright,
-            String assemblyTrademark,
-            String assemblyCulture,
-            String assemblyInformationalVersion
-    ) {
-        this.versionPattern = versionPattern;
+    public ChangeAssemblyVersion(String assemblyFile, String regexPattern, String replacementPattern,
+            String assemblyTitle, String assemblyDescription, String assemblyConfiguration, String assemblyCompany,
+            String assemblyProduct, String assemblyCopyright, String assemblyTrademark, String assemblyCulture,
+            String assemblyVersion, String assemblyInformationalVersion) {
         this.assemblyFile = assemblyFile;
         this.regexPattern = regexPattern;
         this.replacementPattern = replacementPattern;
         this.assemblyTitle = assemblyTitle;
         this.assemblyDescription = assemblyDescription;
+        this.assemblyConfiguration = assemblyConfiguration;
         this.assemblyCompany = assemblyCompany;
         this.assemblyProduct = assemblyProduct;
         this.assemblyCopyright = assemblyCopyright;
         this.assemblyTrademark = assemblyTrademark;
         this.assemblyCulture = assemblyCulture;
+        this.assemblyVersion = assemblyVersion;
         this.assemblyInformationalVersion = assemblyInformationalVersion;
     }
 
     @DataBoundConstructor
-    public ChangeAssemblyVersion(String versionPattern) {
-        this.versionPattern = versionPattern;
+    public ChangeAssemblyVersion(String assemblyVersion) {
+        this.assemblyVersion = assemblyVersion;
     }
 
     @DataBoundSetter
@@ -98,6 +91,11 @@ public class ChangeAssemblyVersion extends Builder implements SimpleBuildStep {
     }
 
     @DataBoundSetter
+    public void setAssemblyConfiguration(String configuration) {
+        this.assemblyConfiguration = configuration;
+    }
+
+    @DataBoundSetter
     public void setAssemblyCompany(String company) {
         this.assemblyCompany = company;
     }
@@ -123,12 +121,8 @@ public class ChangeAssemblyVersion extends Builder implements SimpleBuildStep {
     }
 
     @DataBoundSetter
-    public String getAssemblyInformationalVersion() {
-        return this.assemblyInformationalVersion;
-    }
-
-    public String getVersionPattern() {
-        return this.versionPattern;
+    public void setAssemblyInformationalVersion(String informationalVersion) {
+        this.assemblyInformationalVersion = informationalVersion;
     }
 
     public String getAssemblyFile() {
@@ -151,6 +145,10 @@ public class ChangeAssemblyVersion extends Builder implements SimpleBuildStep {
         return this.assemblyDescription;
     }
 
+    public String getAssemblyConfiguration() {
+        return this.assemblyConfiguration;
+    }
+
     public String getAssemblyCompany() {
         return this.assemblyCompany;
     }
@@ -171,6 +169,14 @@ public class ChangeAssemblyVersion extends Builder implements SimpleBuildStep {
         return this.assemblyCulture;
     }
 
+    public String getAssemblyVersion() {
+        return this.assemblyVersion;
+    }
+
+    public String getAssemblyInformationalVersion() {
+        return this.assemblyInformationalVersion;
+    }
+
     @Override
     public boolean perform(AbstractBuild build, Launcher launcher, BuildListener listener)
             throws InterruptedException, IOException {
@@ -178,27 +184,34 @@ public class ChangeAssemblyVersion extends Builder implements SimpleBuildStep {
             perform(build, build.getWorkspace(), launcher, listener);
         } catch (AbortException ex) {
             return false;
-        } catch (Exception ex) {
+        } catch (IOException | InterruptedException ex) {
             StringWriter sw = new StringWriter();
             ex.printStackTrace(new PrintWriter(sw));
             listener.getLogger().println(sw.toString());
+            throw ex;
         }
-
         return true;
     }
 
     /**
      *
-     * The perform method is gonna search all the file named "Assemblyinfo.cs" in any folder below, and after found will change the version of AssemblyVersion and AssemblyFileVersion in the file for the inserted version (versionPattern property value).
+     * The perform method is gonna search all the file named "Assemblyinfo.cs" in any folder below,
+     * and after found will change the version of AssemblyVersion and AssemblyFileVersion in the file
+     * for the inserted version (versionPattern property value).OBS: The inserted value can be some jenkins
+     * variable like ${BUILD_NUMBER} just the variable alone, but not implemented to treat 0.0.${BUILD_NUMBER}.0
+     * I think this plugin must be used with Version Number Plugin.
      *
-     *
-     * OBS: The inserted value can be some jenkins variable like ${BUILD_NUMBER} just the variable alone, but not implemented to treat 0.0.${BUILD_NUMBER}.0 I think this plugin must be used with Version Number Plugin.
-     *
-     *
+     * @param run
+     * @param workspace
+     * @param launcher
+     * @param listener
+     * @throws java.lang.InterruptedException
+     * @throws java.io.IOException
+     * @throws hudson.AbortException
      */
     @Override
     public void perform(Run<?, ?> run, FilePath workspace, Launcher launcher, TaskListener listener)
-            throws InterruptedException, IOException {
+            throws InterruptedException, IOException, AbortException {
 
         try {
             String assemblyGlob = this.assemblyFile == null || this.assemblyFile.equals("") ? "**/AssemblyInfo.cs" : this.assemblyFile;
@@ -209,48 +222,43 @@ public class ChangeAssemblyVersion extends Builder implements SimpleBuildStep {
                 envVars.overrideAll(((AbstractBuild<?, ?>) run).getBuildVariables());
             }
 
-            String version = new AssemblyVersion(this.versionPattern, envVars).getVersion();
-            if (versionPattern == null || StringUtils.isEmpty(versionPattern)) {
+            AssemblyVersion assemblyInformation = new AssemblyVersion(envVars,
+                    this.assemblyVersion, this.assemblyTitle, this.assemblyDescription, this.assemblyConfiguration,
+                    this.assemblyCompany, this.assemblyProduct, this.assemblyCopyright, this.assemblyTrademark,
+                    this.assemblyCulture, this.assemblyInformationalVersion);
+
+            String version = assemblyInformation.getVersion();
+            if (this.assemblyVersion == null || StringUtils.isEmpty(this.assemblyVersion)) {
                 listener.getLogger().println("Please provide a valid version pattern.");
                 throw new AbortException("Please provide a valid version pattern.");
             }
 
-            // Expand env variables
-            String assemblyTitle = envVars.expand(this.assemblyTitle);
-            String assemblyDescription = envVars.expand(this.assemblyDescription);
-            String assemblyCompany = envVars.expand(this.assemblyCompany);
-            String assemblyProduct = envVars.expand(this.assemblyProduct);
-            String assemblyCopyright = envVars.expand(this.assemblyCopyright);
-            String assemblyTrademark = envVars.expand(this.assemblyTrademark);
-            String assemblyCulture = envVars.expand(this.assemblyCulture);
-            String assemblyInformationalVersion = envVars.expand(this.assemblyInformationalVersion);
-
             // Log new expanded values
             listener.getLogger().println(String.format("Changing File(s): %s", assemblyGlob));
-            listener.getLogger().println(String.format("Assembly Version : %s", version));
-            listener.getLogger().println(String.format("Assembly Title : %s", assemblyTitle));
-            listener.getLogger().println(String.format("Assembly Description : %s", assemblyDescription));
-            listener.getLogger().println(String.format("Assembly Company : %s", assemblyCompany));
-            listener.getLogger().println(String.format("Assembly Product : %s", assemblyProduct));
-            listener.getLogger().println(String.format("Assembly Copyright : %s", assemblyCopyright));
-            listener.getLogger().println(String.format("Assembly Trademark : %s", assemblyTrademark));
-            listener.getLogger().println(String.format("Assembly Culture : %s", assemblyCulture));
-            listener.getLogger().println(String.format("Assembly Informational Version : %s",  assemblyInformationalVersion));
+            listener.getLogger().println(String.format("Assembly Title : %s", assemblyInformation.getTitle()));
+            listener.getLogger().println(String.format("Assembly Description : %s", assemblyInformation.getDescription()));
+            listener.getLogger().println(String.format("Assembly Configuration : %s", assemblyInformation.getConfiguration()));
+            listener.getLogger().println(String.format("Assembly Company : %s", assemblyInformation.getCompany()));
+            listener.getLogger().println(String.format("Assembly Product : %s", assemblyInformation.getProduct()));
+            listener.getLogger().println(String.format("Assembly Copyright : %s", assemblyInformation.getCopyright()));
+            listener.getLogger().println(String.format("Assembly Trademark : %s", assemblyInformation.getTrademark()));
+            listener.getLogger().println(String.format("Assembly Culture : %s", assemblyInformation.getCulture()));
+            listener.getLogger().println(String.format("Assembly Version : %s", assemblyInformation.getVersion()));
+            listener.getLogger().println(String.format("Assembly File Version : %s", assemblyInformation.getVersion()));
+            listener.getLogger().println(String.format("Assembly Informational Version : %s", assemblyInformation.getInformationalVersion()));
 
+            // For each file, replace the assembly information
             for (FilePath f : workspace.list(assemblyGlob)) {
-                // Update the AssemblyVerion and AssemblyFileVersion
-                new ChangeTools(f, this.regexPattern, this.replacementPattern).replace(version, listener);
-
-                // Set new things, empty string being ok for them.
-                // TODO: Would we need a regex for these or just blast as we are doing now?
-                new ChangeTools(f, "AssemblyTitle[(]\".*\"[)]", "AssemblyTitle(\"%s\")").replace(assemblyTitle, listener);
-                new ChangeTools(f, "AssemblyDescription[(]\".*\"[)]", "AssemblyDescription(\"%s\")").replace(assemblyDescription, listener);
-                new ChangeTools(f, "AssemblyCompany[(]\".*\"[)]", "AssemblyCompany(\"%s\")").replace(assemblyCompany, listener);
-                new ChangeTools(f, "AssemblyProduct[(]\".*\"[)]", "AssemblyProduct(\"%s\")").replace(assemblyProduct, listener);
-                new ChangeTools(f, "AssemblyCopyright[(]\".*\"[)]", "AssemblyCopyright(\"%s\")").replace(assemblyCopyright, listener);
-                new ChangeTools(f, "AssemblyTrademark[(]\".*\"[)]", "AssemblyTrademark(\"%s\")").replace(assemblyTrademark, listener);
-                new ChangeTools(f, "AssemblyCulture[(]\".*\"[)]", "AssemblyCulture(\"%s\")").replace(assemblyCulture, listener);
-                new ChangeTools(f, "AssemblyInformationalVersion[(]\".*\"[)]", "AssemblyInformationalVersion(\"%s\")").replace(assemblyInformationalVersion, listener);
+                new ChangeTools(f, "AssemblyTitle[(]\".*\"[)]", "AssemblyTitle(\"%s\")").replace(assemblyInformation.getTitle(), listener);
+                new ChangeTools(f, "AssemblyDescription[(]\".*\"[)]", "AssemblyDescription(\"%s\")").replace(assemblyInformation.getDescription(), listener);
+                new ChangeTools(f, "AssemblyConfiguration[(]\".*\"[)]", "AssemblyConfiguration(\"%s\")").replace(assemblyInformation.getConfiguration(), listener);
+                new ChangeTools(f, "AssemblyCompany[(]\".*\"[)]", "AssemblyCompany(\"%s\")").replace(assemblyInformation.getCompany(), listener);
+                new ChangeTools(f, "AssemblyProduct[(]\".*\"[)]", "AssemblyProduct(\"%s\")").replace(assemblyInformation.getProduct(), listener);
+                new ChangeTools(f, "AssemblyCopyright[(]\".*\"[)]", "AssemblyCopyright(\"%s\")").replace(assemblyInformation.getCopyright(), listener);
+                new ChangeTools(f, "AssemblyTrademark[(]\".*\"[)]", "AssemblyTrademark(\"%s\")").replace(assemblyInformation.getTrademark(), listener);
+                new ChangeTools(f, "AssemblyCulture[(]\".*\"[)]", "AssemblyCulture(\"%s\")").replace(assemblyInformation.getCulture(), listener);
+                new ChangeTools(f, this.regexPattern, this.replacementPattern).replace(assemblyInformation.getVersion(), listener);
+                new ChangeTools(f, "AssemblyInformationalVersion[(]\".*\"[)]", "AssemblyInformationalVersion(\"%s\")").replace(assemblyInformation.getInformationalVersion(), listener);
             }
         } catch (Exception ex) {
             StringWriter sw = new StringWriter();

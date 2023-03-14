@@ -48,14 +48,11 @@ public class ChangeTools {
             }
             listener.getLogger().println(String.format("Updating file : %s, Replacement : %s", file.getRemote(), replacement));
             content = content.replaceAll(regexPattern, String.format(replacementPattern, replacement));
-            OutputStream os = file.write();
-            try {
+            try (OutputStream os = file.write()) {
                 if (bom != null) {
                     os.write(bom.getBytes());
                 }
                 os.write(content.getBytes(fileEncoding));
-            } finally {
-                os.close();
             }
         } else {
             listener.getLogger().println(String.format("Skipping replacement because value is empty."));
