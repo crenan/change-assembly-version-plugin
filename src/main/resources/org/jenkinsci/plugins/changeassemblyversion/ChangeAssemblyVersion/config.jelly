@@ -33,7 +33,7 @@
     <f:entry title="${%Assembly Culture}" field="assemblyCulture">
         <f:textbox/>
     </f:entry>
-    <f:entry title="${%Assembly Version}" field="versionPattern">
+    <f:entry title="${%Assembly Version}" field="assemblyVersion">
         <f:textbox/>
     </f:entry>
     <f:entry title="${%Assembly Informational Version}" field="assemblyInformationalVersion">
