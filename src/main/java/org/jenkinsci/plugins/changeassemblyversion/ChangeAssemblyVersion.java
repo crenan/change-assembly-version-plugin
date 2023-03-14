@@ -37,6 +37,7 @@ public class ChangeAssemblyVersion extends Builder implements SimpleBuildStep {
     private String assemblyCopyright;
     private String assemblyTrademark;
     private String assemblyCulture;
+    private String assemblyInformationalVersion;
 
     @Deprecated
     public ChangeAssemblyVersion(String versionPattern,
@@ -49,7 +50,8 @@ public class ChangeAssemblyVersion extends Builder implements SimpleBuildStep {
             String assemblyProduct,
             String assemblyCopyright,
             String assemblyTrademark,
-            String assemblyCulture
+            String assemblyCulture,
+            String assemblyInformationalVersion
     ) {
         this.versionPattern = versionPattern;
         this.assemblyFile = assemblyFile;
@@ -62,6 +64,7 @@ public class ChangeAssemblyVersion extends Builder implements SimpleBuildStep {
         this.assemblyCopyright = assemblyCopyright;
         this.assemblyTrademark = assemblyTrademark;
         this.assemblyCulture = assemblyCulture;
+        this.assemblyInformationalVersion = assemblyInformationalVersion;
     }
 
     @DataBoundConstructor
@@ -117,6 +120,11 @@ public class ChangeAssemblyVersion extends Builder implements SimpleBuildStep {
     @DataBoundSetter
     public void setAssemblyCulture(String culture) {
         this.assemblyCulture = culture;
+    }
+
+    @DataBoundSetter
+    public String getAssemblyInformationalVersion() {
+        return this.assemblyInformationalVersion;
     }
 
     public String getVersionPattern() {
@@ -215,6 +223,7 @@ public class ChangeAssemblyVersion extends Builder implements SimpleBuildStep {
             String assemblyCopyright = envVars.expand(this.assemblyCopyright);
             String assemblyTrademark = envVars.expand(this.assemblyTrademark);
             String assemblyCulture = envVars.expand(this.assemblyCulture);
+            String assemblyInformationalVersion = envVars.expand(this.assemblyInformationalVersion);
 
             // Log new expanded values
             listener.getLogger().println(String.format("Changing File(s): %s", assemblyGlob));
@@ -226,6 +235,7 @@ public class ChangeAssemblyVersion extends Builder implements SimpleBuildStep {
             listener.getLogger().println(String.format("Assembly Copyright : %s", assemblyCopyright));
             listener.getLogger().println(String.format("Assembly Trademark : %s", assemblyTrademark));
             listener.getLogger().println(String.format("Assembly Culture : %s", assemblyCulture));
+            listener.getLogger().println(String.format("Assembly Informational Version : %s",  assemblyInformationalVersion));
 
             for (FilePath f : workspace.list(assemblyGlob)) {
                 // Update the AssemblyVerion and AssemblyFileVersion
@@ -240,6 +250,7 @@ public class ChangeAssemblyVersion extends Builder implements SimpleBuildStep {
                 new ChangeTools(f, "AssemblyCopyright[(]\".*\"[)]", "AssemblyCopyright(\"%s\")").replace(assemblyCopyright, listener);
                 new ChangeTools(f, "AssemblyTrademark[(]\".*\"[)]", "AssemblyTrademark(\"%s\")").replace(assemblyTrademark, listener);
                 new ChangeTools(f, "AssemblyCulture[(]\".*\"[)]", "AssemblyCulture(\"%s\")").replace(assemblyCulture, listener);
+                new ChangeTools(f, "AssemblyInformationalVersion[(]\".*\"[)]", "AssemblyInformationalVersion(\"%s\")").replace(assemblyInformationalVersion, listener);
             }
         } catch (Exception ex) {
             StringWriter sw = new StringWriter();
